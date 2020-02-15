@@ -1,11 +1,11 @@
 from os import environ
 
-from quart import Quart
+from quart_openapi import Pint
 
 import service.config as default_config
 
 
-app = Quart(__name__)
+app = Pint(__name__, title='Exact Time Service')
 app.config.from_object(default_config)
 
 

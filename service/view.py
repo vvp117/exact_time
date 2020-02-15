@@ -1,14 +1,29 @@
 from time import time, strftime, localtime
+from functools import wraps
 
 from quart import jsonify
-from quart.views import MethodView
+from quart_openapi import Resource
 import asyncio_dgram  # https://pypi.org/project/asyncio-dgram/
 import ntplib as ntp  # https://pypi.org/project/ntplib/
 
 from service import app
 
 
-class TimeService(MethodView):
+def params_to_doc(*params):
+
+    def formatter(func):
+        func.__doc__ = func.__doc__.format(*params)
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        return wrapper
+
+    return formatter
+
+
+@app.route('/time')
+class ExactTimeService(Resource):
 
     @staticmethod
     def create_ntp_request_data():
@@ -36,14 +51,14 @@ class TimeService(MethodView):
 
         stream = await asyncio_dgram.connect((host, port))
 
-        ntp_request = TimeService.create_ntp_request_data()
+        ntp_request = ExactTimeService.create_ntp_request_data()
 
         await stream.send(ntp_request)
         response_data, remote_addr = await stream.recv()
 
         stream.close()
 
-        ntp_stats = TimeService.get_ntp_stats(response_data)
+        ntp_stats = ExactTimeService.get_ntp_stats(response_data)
 
         struct_time = localtime(ntp_stats.tx_time)
 
@@ -59,8 +74,13 @@ class TimeService(MethodView):
 
         return result
 
-    @app.route('/time')
-    async def get():
-        result = await TimeService.exact_time()
+    @params_to_doc(app.config['NTP_SERVER'])
+    async def get(self):
+        '''
+        Returns exact time
+
+        Server used: {0}
+        '''
+        result = await ExactTimeService.exact_time()
 
         return jsonify(result)
