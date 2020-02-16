@@ -9,6 +9,11 @@ import ntplib as ntp  # https://pypi.org/project/ntplib/
 from service import app
 
 
+@app.route('/openapi.json')
+async def openapi():
+    return jsonify(app.__schema__)
+
+
 def params_to_doc(*params):
 
     def formatter(func):
@@ -22,7 +27,7 @@ def params_to_doc(*params):
     return formatter
 
 
-@app.route('/time')
+@app.route('/api/v1/time/ntp', methods=['GET'])
 class ExactTimeService(Resource):
 
     @staticmethod
@@ -79,8 +84,36 @@ class ExactTimeService(Resource):
         '''
         Returns exact time
 
-        Server used: {0}
+        NTP Server used: {0}
         '''
         result = await ExactTimeService.exact_time()
 
         return jsonify(result)
+
+
+@app.route('/api/v1/time/ya/suggest-geo/<string:name_part>', methods=['GET'])
+@app.route('/api/v1/time/ya/sync/<int:geo_id>', methods=['GET'])
+@app.route('/api/v1/time/ya/sync/by_list', methods=['POST'])
+class YandexTimeService(Resource):
+
+    @app.param('name_part',
+               description='Part of the city name',
+               _in='path', required=True)
+    @app.param('geo_id',
+               description='Yandex Geo-ID from */api/v1/time/ya/suggest-geo',
+               _in='path', required=True)
+    async def get(self, name_part='', geo_id=''):
+        # https://suggest-maps.yandex.ru/suggest-geo?...
+        # https://yandex.com/time/sync.json?geo=N
+
+        result = {
+            'host': 'yandex',
+            'full_time': strftime('%Y.%m.%d %H:%M:%S %z', localtime()),
+        }
+
+        return jsonify(result)
+
+    async def post(self):
+        # https://yandex.com/time/sync.json?geo=65
+
+        return jsonify({'relult': 'OK'})

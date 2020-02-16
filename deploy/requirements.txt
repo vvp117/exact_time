@@ -2,3 +2,4 @@ Quart==0.11.2
 asyncio-dgram==1.0.1
 ntplib==0.3.3
 quart-openapi==1.5.2
+pytest-asyncio==0.10.0

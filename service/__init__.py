@@ -5,7 +5,7 @@ from quart_openapi import Pint
 import service.config as default_config
 
 
-app = Pint(__name__, title='Exact Time Service')
+app = Pint(__name__, no_openapi=True, title='Exact Time Service')
 app.config.from_object(default_config)
 
 
