@@ -1,10 +1,13 @@
 from time import time, strftime, localtime
 from functools import wraps
+from string import Template
 
-from quart import jsonify
+from quart import jsonify, abort, request
 from quart_openapi import Resource
+from quart_openapi.resource import get_expect_args
 import asyncio_dgram  # https://pypi.org/project/asyncio-dgram/
 import ntplib as ntp  # https://pypi.org/project/ntplib/
+from aiohttp import ClientSession
 
 from service import app
 
@@ -50,9 +53,9 @@ class ExactTimeService(Resource):
         return ntp_stats
 
     @staticmethod
-    async def exact_time():
-        host = app.config['NTP_SERVER']
-        port = app.config['NTP_PORT']
+    async def exact_time(host, port):
+        host = host or app.config['NTP_SERVER']
+        port = port or app.config['NTP_PORT']
 
         stream = await asyncio_dgram.connect((host, port))
 
@@ -79,41 +82,135 @@ class ExactTimeService(Resource):
 
         return result
 
+    @app.param('ntp_server',
+               description='Selected NTP-server',
+               _in='query', required=False)
+    @app.param('ntp_port',
+               description='Port NTP-server (default: 123)',
+               schema={'type': 'integer'},
+               _in='query', required=False)
     @params_to_doc(app.config['NTP_SERVER'])
     async def get(self):
         '''
         Returns exact time
 
-        NTP Server used: {0}
+        Default NTP-server:port used: {0}:123
         '''
-        result = await ExactTimeService.exact_time()
+        ntp_server = request.args.get('ntp_server')
+        ntp_port = int(request.args.get('ntp_port', 0))
+
+        result = await ExactTimeService.exact_time(ntp_server, ntp_port)
 
         return jsonify(result)
 
 
-@app.route('/api/v1/time/ya/suggest-geo/<string:name_part>', methods=['GET'])
-@app.route('/api/v1/time/ya/sync/<int:geo_id>', methods=['GET'])
-@app.route('/api/v1/time/ya/sync/by_list', methods=['POST'])
-class YandexTimeService(Resource):
+@app.route('/api/v1/ya/suggest-geo/<string:name_part>')
+class YandexSuggestGeo(Resource):
+    SUGGEST_RESULTS = 10
+    SUGGEST_VERSION = '9'
+
+    url_template = Template(
+        'https://suggest-maps.yandex.ru/suggest-geo'
+        '?search_type=tune'
+        f'&v={SUGGEST_VERSION}'
+        f'&results={SUGGEST_RESULTS}'
+        '&lang=ru_RU'
+        '&part=$name_part'
+    )
 
     @app.param('name_part',
                description='Part of the city name',
                _in='path', required=True)
-    @app.param('geo_id',
-               description='Yandex Geo-ID from */api/v1/time/ya/suggest-geo',
-               _in='path', required=True)
-    async def get(self, name_part='', geo_id=''):
-        # https://suggest-maps.yandex.ru/suggest-geo?...
-        # https://yandex.com/time/sync.json?geo=N
+    @params_to_doc(SUGGEST_RESULTS)
+    async def get(self, name_part):
+        '''
+        Search for cities by name part
 
-        result = {
-            'host': 'yandex',
-            'full_time': strftime('%Y.%m.%d %H:%M:%S %z', localtime()),
-        }
+        Number of Results: {0}
+        '''
+        url = YandexSuggestGeo.url_template.substitute(
+            name_part=name_part)
+
+        result = None
+        async with ClientSession() as session:
+            async with session.get(url) as resp:
+                result = await resp.json()
 
         return jsonify(result)
 
-    async def post(self):
-        # https://yandex.com/time/sync.json?geo=65
 
-        return jsonify({'relult': 'OK'})
+def validate_body(method):
+
+    doc_attr = '__apidoc__'
+
+    if not hasattr(method, doc_attr):
+        raise KeyError(
+            f'"{doc_attr}" attribute required! '
+            'Place @validate_body higher than @app.expect')
+
+    @wraps(method)
+    async def wrapper(self, **kwargs):
+        if request.headers.get('Content-Type') != 'application/json':
+            raise abort(400,
+                        description='Content type must be '
+                        '"application / json"',
+                        name='InvalidHeaders')
+
+        for expect in getattr(method, doc_attr).get('expect', []):
+            validator, content_type, _ = get_expect_args(expect)
+            if content_type == 'application/json' and request.is_json:
+                data = await request.get_json(force=True, cache=True)
+                validator.validate(data)
+
+        return await method(self, **kwargs)
+
+    return wrapper
+
+
+@app.route('/api/v1/ya/time')
+class YandexTime(Resource):
+
+    url_template = Template('https://yandex.com/time/sync.json?geo=$geo_ids')
+
+    validator = app.create_validator(
+        'ya_time_request',
+        {
+            'type': 'array',
+            'items': {
+                'type': 'number'
+                }
+        }
+    )
+
+    @validate_body
+    @app.param('Content-Type',
+               description='Need set "Content-Type": "application/json"',
+               _in='header')
+    @app.expect(validator, validate=False)
+    async def post(self):
+        '''
+        Return time from Yandex
+
+        Takes a geo-id array from \'*/api/v1/time/ya/suggest-geo\'
+        '''
+        geo_ids = await request.get_json()
+
+        if not geo_ids:
+            return abort(400,
+                         description='Need parameters: array "geo_id"',
+                         name='NoRequestParameters')
+
+        geo_ids = [str(geo_id) for geo_id in geo_ids]
+        url = YandexTime.url_template.substitute(
+            geo_ids='&geo='.join(geo_ids)
+        )
+
+        async with ClientSession() as session:
+            async with session.get(url) as resp:
+                result = await resp.json()
+
+        if not result:
+            error_description = f'No data for this identifier ({geo_ids})'
+            return abort(400, description=error_description)
+
+        return jsonify(result)
