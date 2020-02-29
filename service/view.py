@@ -1,6 +1,8 @@
 from time import time, strftime, localtime
 from functools import wraps
 from string import Template
+from tempfile import gettempdir
+from json import dumps
 
 from quart import jsonify, abort, request
 from quart_openapi import Resource
@@ -8,9 +10,9 @@ from quart_openapi.resource import get_expect_args
 import asyncio_dgram  # https://pypi.org/project/asyncio-dgram/
 import ntplib as ntp  # https://pypi.org/project/ntplib/
 from aiohttp import ClientSession
+from swagger_ui import api_doc
 
 from service import app
-from swagger_blueprint import get_swaggerui_blueprint
 
 
 @app.route('/openapi.json')
@@ -217,20 +219,12 @@ class YandexTime(Resource):
         return jsonify(result)
 
 
-# =====================================================================================
-# SWAGGER UI
-# Original repo:
-# https://github.com/sveint/flask-swagger-ui/tree/master/flask_swagger_ui
-# Example:
-# https://medium.com/@sean_bradley/add-swagger-ui-to-your-python-flask-api-683bfbb32b36
-SWAGGER_URL = '/api'
-swaggerui_blueprint = get_swaggerui_blueprint(
-    base_url=SWAGGER_URL,
-    api_url='/api/swagger.json',
-    config={
-        'app_name': "Exact-Time"
-    }
-)
+@app.before_serving
+async def add_swagger():
+    swagger_config = f'{gettempdir()}/swagger.json'
 
-app.register_blueprint(swaggerui_blueprint,
-                       url_prefix=SWAGGER_URL)
+    with open(swagger_config, 'w') as f:
+        f.write(dumps(app.__schema__))
+
+    api_doc(app, config_path=swagger_config,
+            url_prefix='/api', title='API doc')
