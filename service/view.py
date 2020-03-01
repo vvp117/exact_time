@@ -33,6 +33,34 @@ def params_to_doc(*params):
     return formatter
 
 
+def validate_body(method):
+
+    doc_attr = '__apidoc__'
+
+    if not hasattr(method, doc_attr):
+        raise KeyError(
+            f'"{doc_attr}" attribute required! '
+            'Place @validate_body higher than @app.expect')
+
+    @wraps(method)
+    async def wrapper(self, **kwargs):
+        if request.headers.get('Content-Type') != 'application/json':
+            raise abort(400,
+                        description='Content type must be '
+                        '"application / json"',
+                        name='InvalidHeaders')
+
+        for expect in getattr(method, doc_attr).get('expect', []):
+            validator, content_type, _ = get_expect_args(expect)
+            if content_type == 'application/json' and request.is_json:
+                data = await request.get_json(force=True, cache=True)
+                validator.validate(data)
+
+        return await method(self, **kwargs)
+
+    return wrapper
+
+
 @app.route('/api/v1/time/ntp', methods=['GET'])
 class ExactTimeService(Resource):
 
@@ -93,6 +121,9 @@ class ExactTimeService(Resource):
                schema={'type': 'integer'},
                _in='query', required=False)
     @params_to_doc(app.config['NTP_SERVER'])
+    @app.response(200,
+                  'Exact time (structured)',
+                  validator=app.create_ref_validator('TimeNTP', 'schemas'))
     async def get(self):
         '''
         Returns exact time
@@ -142,47 +173,15 @@ class YandexSuggestGeo(Resource):
         return jsonify(result)
 
 
-def validate_body(method):
-
-    doc_attr = '__apidoc__'
-
-    if not hasattr(method, doc_attr):
-        raise KeyError(
-            f'"{doc_attr}" attribute required! '
-            'Place @validate_body higher than @app.expect')
-
-    @wraps(method)
-    async def wrapper(self, **kwargs):
-        if request.headers.get('Content-Type') != 'application/json':
-            raise abort(400,
-                        description='Content type must be '
-                        '"application / json"',
-                        name='InvalidHeaders')
-
-        for expect in getattr(method, doc_attr).get('expect', []):
-            validator, content_type, _ = get_expect_args(expect)
-            if content_type == 'application/json' and request.is_json:
-                data = await request.get_json(force=True, cache=True)
-                validator.validate(data)
-
-        return await method(self, **kwargs)
-
-    return wrapper
-
-
 @app.route('/api/v1/ya/time')
 class YandexTime(Resource):
 
     url_template = Template('https://yandex.com/time/sync.json?geo=$geo_ids')
 
-    _, schema = app.base_model.resolve('#/components/schemas/ListGeoIDs')
-    validator = app.create_validator('ya_time_request', schema)
+    post_request_validator = app.create_ref_validator('ListGeoIDs', 'schemas')
 
     @validate_body
-    @app.param('Content-Type',
-               description='Need set "Content-Type": "application/json"',
-               _in='header')
-    @app.expect(validator, validate=False)
+    @app.expect(post_request_validator, validate=False)
     async def post(self):
         '''
         Return time from Yandex

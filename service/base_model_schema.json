@@ -6,6 +6,33 @@
                     "items": {
                         "type": "number"
                         }
+                },
+                "TimeNTP": {
+                    "type": "object",
+                    "properties": {
+                        "host": {
+                          "type": "string"
+                        },
+                        "offset": {
+                            "type": "number",
+                            "format": "float"
+                        },
+                        "date": {
+                            "type": "string"
+                        },
+                        "time": {
+                            "type": "string"
+                        },
+                        "zone": {
+                            "type": "string"
+                        },
+                        "full_time": {
+                            "type": "string"
+                        },
+                        "ref_id": {
+                            "type": "string"
+                        }
+                    }
                 }
         }
     }
