@@ -175,15 +175,8 @@ class YandexTime(Resource):
 
     url_template = Template('https://yandex.com/time/sync.json?geo=$geo_ids')
 
-    validator = app.create_validator(
-        'ya_time_request',
-        {
-            'type': 'array',
-            'items': {
-                'type': 'number'
-                }
-        }
-    )
+    _, schema = app.base_model.resolve('#/components/schemas/ListGeoIDs')
+    validator = app.create_validator('ya_time_request', schema)
 
     @validate_body
     @app.param('Content-Type',
