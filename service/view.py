@@ -197,6 +197,10 @@ class YandexTime(Resource):
 
     @validate_body
     @app.expect(post_request_validator, validate=False)
+    @app.response(200,
+                  'Time from Yandex for geo-objects by IDs',
+                  validator=app.create_ref_validator('TimeYandex',
+                                                     'schemas'))
     async def post(self):
         '''
         Return time from Yandex

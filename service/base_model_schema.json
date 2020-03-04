@@ -74,6 +74,78 @@
                                 }
                         }
                     }
+                },
+                "ClockYandex": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "number"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "offset": {
+                                    "type": "number"
+                                },
+                                "offsetString": {
+                                    "type": "string"
+                                },
+                                "showSunriseSunset": {
+                                    "type": "boolean"
+                                },
+                                "sunrise": {
+                                    "type": "string"
+                                },
+                                "sunset": {
+                                    "type": "string"
+                                },
+                                "isNight": {
+                                    "type": "boolean"
+                                },
+                                "skyColor": {
+                                    "type": "string"
+                                },
+                                "weather": {
+                                    "type": "object",
+                                    "properties": {
+                                        "temp": {"type": "number"},
+                                        "icon": {"type": "string"},
+                                        "link": {"type": "string"}
+                                    }
+                                },
+                                "parents":  {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "number"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                },
+                "TimeYandex": {
+                    "type": "object",
+                    "properties": {
+                        "time": {
+                          "type": "number"
+                        },
+                        "clocks": {
+                            "type": "object",
+                            "description": "Clock keys ('^[0-9]+$') are equal to their 'id' properties",
+                            "properties": {
+                                "^[0-9]+$": {
+                                    "$ref": "#/components/schemas/ClockYandex"
+                                }
+                            },
+                            "additionalProperties": true
+                        }
+                    }
                 }
         }
     }
