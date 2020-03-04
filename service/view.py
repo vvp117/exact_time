@@ -121,9 +121,9 @@ class ExactTimeService(Resource):
                schema={'type': 'integer'},
                _in='query', required=False)
     @params_to_doc(app.config['NTP_SERVER'])
-    @app.response(200,
-                  'Exact time (structured)',
-                  validator=app.create_ref_validator('TimeNTP', 'schemas'))
+    @app.response(200, 'Exact time (structured)',
+                  validator=app.create_ref_validator('TimeNTP',
+                                                     'schemas'))
     async def get(self):
         '''
         Returns exact time
@@ -140,30 +140,45 @@ class ExactTimeService(Resource):
 
 @app.route('/api/v1/ya/suggest-geo/<string:name_part>')
 class YandexSuggestGeo(Resource):
-    SUGGEST_RESULTS = 10
+    SUGGEST_RESULTS_DEFAULT = 10
+    SUGGEST_RESULTS_MAX = 20
     SUGGEST_VERSION = '9'
 
     url_template = Template(
         'https://suggest-maps.yandex.ru/suggest-geo'
         '?search_type=tune'
         f'&v={SUGGEST_VERSION}'
-        f'&results={SUGGEST_RESULTS}'
+        f'&results=$results'
         '&lang=ru_RU'
         '&part=$name_part'
     )
 
     @app.param('name_part',
-               description='Part of the city name',
+               description='Part of the city name (url encoded)',
                _in='path', required=True)
-    @params_to_doc(SUGGEST_RESULTS)
+    @app.param('results',
+               description='Number of Results (default: 10, max: 20)',
+               schema={'type': 'integer'},
+               _in='query', required=False)
+    @params_to_doc(SUGGEST_VERSION)
+    @app.response(200,
+                  'Search results for a part of the name of a geo-object',
+                  validator=app.create_ref_validator('SuggestResults',
+                                                     'schemas'))
     async def get(self, name_part):
         '''
-        Search for cities by name part
+        Search for a geo-objects by name part
 
-        Number of Results: {0}
+        Suggest version: {0};
         '''
+        results = YandexSuggestGeo.SUGGEST_RESULTS_DEFAULT
+        results = int(request.args.get('results', results))
+        results = max(results, 1)
+        results = min(results, YandexSuggestGeo.SUGGEST_RESULTS_MAX)
+
         url = YandexSuggestGeo.url_template.substitute(
-            name_part=name_part)
+            name_part=name_part,
+            results=results)
 
         result = None
         async with ClientSession() as session:

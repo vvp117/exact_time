@@ -33,6 +33,47 @@
                             "type": "string"
                         }
                     }
+                },
+                "SuggestResult": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "title": {
+                            "type": "string"
+                        },
+                        "subtitle": {
+                            "type": "string"
+                        },
+                        "size": {
+                            "type": "number",
+                            "format": "float"
+                        },
+                        "geoid": {
+                            "type": "number"
+                        },
+                        "pos": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "SuggestResults": {
+                    "type": "object",
+                    "properties": {
+                        "part": {
+                          "type": "string"
+                        },
+                        "suggest_reqid": {
+                            "type": "string"
+                        },
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SuggestResult"
+                                }
+                        }
+                    }
                 }
         }
     }
