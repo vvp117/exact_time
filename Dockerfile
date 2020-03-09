@@ -1,15 +1,15 @@
 FROM python:3.7-slim
 
-LABEL Name=exact_time
+LABEL Name=exact-time
 EXPOSE 5000
 
 WORKDIR /app
 
-COPY exact_time /app/exact_time
-COPY config.py /app
+# add and install requirements
+COPY ./deploy/requirements.txt /tmp/
+RUN pip install -r /tmp/requirements.txt
 
-RUN pip install -r exact_time/deploy/requirements.txt
+# add app
+COPY . .
 
-ENV QUART_CONFIG config.py
-
-ENTRYPOINT ["hypercorn", "--bind", "0.0.0.0:5000", "exact_time/service:app"]
+ENTRYPOINT ["hypercorn", "--bind", "0.0.0.0:5000", "service:app"]
