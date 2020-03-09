@@ -8,9 +8,8 @@ WORKDIR /app
 COPY exact_time /app/exact_time
 COPY config.py /app
 
-RUN pip install -r /app/exact_time/deploy/requirements.txt
+RUN pip install -r exact_time/deploy/requirements.txt
 
-ENV QUART_APP /app/exact_time/service:app
-ENV QUART_CONFIG /app/config.py
+ENV QUART_CONFIG config.py
 
-ENTRYPOINT ["quart", "run", "-h", "0.0.0.0", "-p", "5000"]
+ENTRYPOINT ["hypercorn", "--bind", "0.0.0.0:5000", "exact_time/service:app"]
