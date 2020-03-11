@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    name: exact-time
+  name: exact-time
+spec:
+  progressDeadlineSeconds: 2147483647
+  replicas: 1
+  selector:
+    matchLabels:
+      app: exact-time
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: exact-time
+    spec:
+      containers:
+      - env:
+        - name: QUART_ENV
+          value: development
+        - name: NTP_SERVER
+          value: ntp1.stratum1.ru
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: exact-time-secret-key
+              name: app-credentials
+        image: vvp117/exact-time:v1
+        # imagePullPolicy:
+        #   - Always - pull from repository
+        #   - IfNotPresent - local image is used preferentially
+        #   - Never - local image is used exclusively
+        imagePullPolicy: IfNotPresent
+        name: exact-time
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30

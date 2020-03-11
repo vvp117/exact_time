@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: exact-time
+  labels:
+    service: exact-time
+spec:
+  selector:
+    app: exact-time
+  ports:
+  - port: 5000
+    targetPort: 5000

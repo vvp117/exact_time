@@ -1,0 +1,14 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: minikube-ingress
+  annotations:
+spec:
+  rules:
+  - host: exact-time.service
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: exact-time
+          servicePort: 5000
